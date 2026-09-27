@@ -21,7 +21,9 @@ dsh plugin --profile <name> add @buberlo/dsh-jev@0.1.4
 dsh --profile <name> --dump-config   # shows the "# == @buberlo/dsh-jev" layer
 ```
 
-`0.1.4` is the registry release (`npm view` 2026-09-23, `latest`). Its
+`0.1.4` is the registry release (`npm view` 2026-09-23, `latest`); the workspace
+in this repository is `0.1.5`, **not yet published**, so the install above
+resolves to `0.1.4`. Its
 dependency on `@buberlo/jev-core` is `^0.1.4`. Do not install `@0.1.2` or
 `@0.1.3`: those tarballs still use a literal `workspace:^`, and `npm install`
 fails (`EUNSUPPORTEDPROTOCOL`). `0.1.3` was abandoned after a staged-version
@@ -71,8 +73,9 @@ Live API — two explicit settings, never implicit:
 
 In a web/desktop profile the bundle ships a configuration page on the Plugins
 page: provider, live mode selector, a write-only API key field, and the five
-feature toggles. Writes go to the host settings document and reconfigure the
-running service immediately.
+feature toggles. Writes go into the active profile's Cordis patch through the
+config-forms service and reconfigure the running service immediately; the page
+edits only fields the plugin declares `.volatile()`.
 
 ## What it does
 

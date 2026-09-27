@@ -44,11 +44,11 @@ no model answer can widen a permission. Jev only ever narrows or gates.
 | | |
 |---|---|
 | Packages | `@buberlo/jev-core` (harness-independent) · `@buberlo/dsh-jev` (DSH plugin/bundle) |
-| npm | `npm view` 2026-09-23 lists `0.1.0`, `0.1.2`, `0.1.3`, and `0.1.4`. Dist-tag `latest` is `0.1.4` for both packages. Workspace is `0.1.4`. `npm install @buberlo/dsh-jev@0.1.4` resolves `@buberlo/jev-core@^0.1.4`. Do not install `@buberlo/dsh-jev@0.1.2` or `@0.1.3` (literal `workspace:^`, `EUNSUPPORTEDPROTOCOL`). `0.1.3` was abandoned after a staged-version conflict (E409). |
-| Verified DSH | `0.1.6-alpha.2` (commit `ddefc45`), `@deepseek-ai/cordis` 4.0.2 |
+| npm | `npm view` 2026-09-23 lists `0.1.0`, `0.1.2`, `0.1.3`, and `0.1.4`. Dist-tag `latest` is `0.1.4` for both packages. The **workspace** is `0.1.5` — this adaptation, **not yet published**; the registry line stays `0.1.4`. `npm install @buberlo/dsh-jev@0.1.4` resolves `@buberlo/jev-core@^0.1.4`. Do not install `@buberlo/dsh-jev@0.1.2` or `@0.1.3` (literal `workspace:^`, `EUNSUPPORTEDPROTOCOL`). `0.1.3` was abandoned after a staged-version conflict (E409). |
+| Verified DSH | `0.1.7-rc.2`, `@deepseek-ai/cordis` 4.0.4, `@deepseek-ai/schemastery` 3.18.4. Every direct pin is exact. `docs/upstream-compatibility.md` separates what was executed at this version from what is carried over from `0.1.6-alpha.2`. |
 | Verified TypeSafe SDK | `@typesafe-ai/sdk` 0.6.0 |
 | Defaults | `provider: mock`, `mode: shadow` — offline, no behavior change |
-| Tests | 147 (85 core + 62 DSH integration) · 25 evaluation fixtures plus the on-prem support set |
+| Tests | core **85** and DSH integration **62** passed at `0.1.7-rc.2` — **zero delta** from the `0.1.6-alpha.2` baseline on both suites. Plus 25 evaluation fixtures and the on-prem support set. |
 | Live API | implemented, requires an explicit key; not part of any default |
 | License | MIT |
 
@@ -169,15 +169,17 @@ Do not install `@buberlo/dsh-jev@0.1.2` or `@0.1.3`. Those tarballs still
 contain `"@buberlo/jev-core": "workspace:^"` (packed with npm, not pnpm).
 `npm install` fails with `EUNSUPPORTEDPROTOCOL`. `0.1.3` was abandoned: a
 granular bypass-2FA token staged the version, and republish returns E409.
-`0.1.4` is the publish that replaced it. Workspace `package.json` is `0.1.4`.
+`0.1.4` is the publish that replaced it. The **workspace** `package.json` is
+`0.1.5` (this adaptation, not yet published — every registry install above still
+resolves to `0.1.4`).
 
-A checkout packs the same version. Use pnpm so `workspace:` is rewritten:
+A checkout packs the workspace version. Use pnpm so `workspace:` is rewritten:
 
 ```sh
 pnpm --filter @buberlo/jev-core pack --pack-destination ./packs
 pnpm --filter @buberlo/dsh-jev pack --pack-destination ./packs
-dsh plugin --profile <name> add ./packs/buberlo-dsh-jev-0.1.4.tgz
-# overlay packs/buberlo-jev-core-0.1.4.tgz on the profile
+dsh plugin --profile <name> add ./packs/buberlo-dsh-jev-0.1.5.tgz
+# overlay packs/buberlo-jev-core-0.1.5.tgz on the profile
 # (see BENCH_LOCAL_PACKS in docs/benchmark.md)
 dsh --profile <name> --dump-config   # shows the "# == @buberlo/dsh-jev" layer
 ```
@@ -236,8 +238,11 @@ what Jev does in the loop and edits the safe subset live:
   routing).
 
 Provider, model, and API key stay in `cordis.yml` (the key is a secret and is
-never displayed). Headless profiles have no web client and simply ignore this
-half; the plugin runs identically from its composed configuration.
+never displayed). Writes land in the active profile's Cordis patch through the
+config-forms service; the fields this page edits are declared `.volatile()` in
+the plugin's `Config`, so a committed change applies without a restart.
+Headless profiles have no web client and simply ignore this half; the plugin
+runs identically from its composed configuration.
 
 <details>
 <summary>All configuration fields and their defaults</summary>
@@ -266,7 +271,9 @@ half; the plugin runs identically from its composed configuration.
 ## How the integration stays safe
 
 - **No implicit live access.** `provider: live` without an explicit key fails
-  at plugin load — verified through the real `dsh` loader.
+  at plugin load — reproduced in the real `0.1.7-rc.2` product, where the boot
+  instantiates `JevRuntime` through `cordis@4.0.4` and fails closed with the
+  exact apiKey error (`docs/adaptation/07-verification.md` §2.9).
 - **No model-derived permissions.** Failures, timeouts, aborts, stale
   snapshots, and validation errors produce `ask`/`hold`; configuration rejects
   anything else.
@@ -309,15 +316,16 @@ model judgments themselves are not a safety guarantee. Full method, raw numbers,
 
 | Area | Status |
 |---|---|
-| `@buberlo/jev-core` | implemented, 82 unit tests |
-| `@buberlo/dsh-jev` | implemented, 38 integration tests (real ToolRuntime, real agent loop, real approval service, real settings provider) |
+| `@buberlo/jev-core` | implemented, 85 unit tests passed on `0.1.7-rc.2` |
+| `@buberlo/dsh-jev` | implemented; 62 integration tests passed at `0.1.7-rc.2` (real ToolRuntime, real agent loop, real approval service, real settings service). |
 | Dynamic tool selection | tested incl. pre-existing denials and parallel sessions |
 | Call assessment + approvals | tested incl. changed arguments and fail-closed paths |
 | Loop guard | tested (per-agent isolation, shadow vs enforce) |
 | Model routing | tested with verified-availability fallback |
 | Skill routing + vendored TypeSafe skill | tested against the real filesystem provider |
-| Web client configuration page | implemented (bundle-keyed Plugins page); settings write and card interactions tested; module served by a running web app |
-| Real `dsh` CLI profile/loader | verified (see `docs/upstream-compatibility.md`) |
+| Web client configuration page | implemented (bundle-keyed Plugins page); the emitted artifact and the host-side write path are tested at `0.1.7-rc.2`; the browser→Host round trip itself is not executed, and the "module served by a running web app" proof is carried over from `0.1.6-alpha.2` |
+| Real `dsh` CLI profile/loader | verified at `0.1.7-rc.2` with a throwaway profile: `--dump-config` composes the bundle layer, and a real boot instantiates `JevRuntime` through `cordis@4.0.4`, fails closed on `live`-without-key, then reaches the LLM credential stage (`docs/upstream-compatibility.md`) |
+| Repository gate | `pnpm verify` executed end to end: install → build → typecheck → tests → evals → calibrate → examples → packaging, `verify: OK` (see `docs/upstream-compatibility.md`) |
 | Published packages | `npm view` 2026-09-23: `0.1.0`, `0.1.2`, `0.1.3`, `0.1.4`; `latest` is `0.1.4`. `@buberlo/dsh-jev@0.1.4` installs with `@buberlo/jev-core@^0.1.4`. Plugin `@0.1.2` and `@0.1.3` are broken (`workspace:^`) and must not be installed. `0.1.3` abandoned (staged E409). End-to-end `dsh` profile install was verified for `0.1.0` (2026-09-19), not re-run for `0.1.4`. |
 | Live TypeSafe API | executed 2026-09-19 (`jev-1.13.0`): 25/25 fixture agreement, 0 errors, mean 483 ms — a measurement, not an accuracy claim |
 | Threshold calibration | `pnpm calibrate` measures once and sweeps thresholds; live run reports agreement ranges (defaults are inside them), not calibrated operating points |
@@ -356,7 +364,7 @@ scripts/               verify.sh · packaging-test.mjs · run-evals.ts
 ```sh
 pnpm install          # workspace install
 pnpm build            # tsc for both packages
-pnpm test             # 147 tests (85 core + 62 DSH)
+pnpm test             # vitest per package (core 85, dsh-jev 62)
 pnpm calibrate        # threshold sweep over the 25 decision fixtures (mock; --live with a key)
 pnpm bench:compare    # with/without Jev: real loop, scripted model, no key needed
 pnpm bench:cli        # CLI A/B run harness (needs an OpenAI-compatible gateway)

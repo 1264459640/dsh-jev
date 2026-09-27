@@ -38,15 +38,25 @@ importing only `@buberlo/jev-core`.
 
 The plugin package ships two faces:
 
-- **Host** (default export): the `ctx.jev` service and its adapters, plus the
-  `jev` settings namespace registered through `ctx.settings.installSection`.
-  Committed settings writes reconfigure the running service (mode and feature
-  toggles) without a reload; the composed `cordis.yml` entry is the base layer.
+- **Host** (default export): the `ctx.jev` service and its adapters. The
+  configuration fields the web page edits are declared `.volatile()` in the
+  plugin's schemastery `Config`, so the settings service projects them into a
+  form for the `jev` profile entry. A committed write goes into the active
+  profile's Cordis patch and reconfigures the running service (mode and feature
+  toggles) without a reload; the composed `cordis.yml` entry remains the base
+  layer. The exact service surface is recorded in
+  `docs/upstream-compatibility.md`. A row installed by a patch layer `insert` —
+  which is how `cordis.patch.yml` installs this bundle — is writable through the
+  form; a row present only in the leaf `cordis.yml` is not, because the config
+  editor recomposes only the layers it owns (bundle layers, profile patch, home
+  patch, CLI overlays).
 - **Browser** (`./client`, `dsh.client.platform: web`): the bundle's
   configuration page, registered into `plugins.bundle.config` keyed by the
   package name and rendered on the bundle's Plugins page. It reads and writes
-  through `ctx.settingsScope`, which fences every write with the revision it
-  read.
+  through the config-forms service (`ctx.configForms.get(entryId)`), whose
+  `ConfigForm` fences every write with the revision it read and returns an
+  acceptance flag. `ConfigForm.set(field, …)` takes a single path segment, so a
+  nested field is written with `mutate([{ op: 'set', path: [...] }])`.
 
 Two upstream constraints shape the client half. Cross-plugin value imports are
 forbidden (bundle-purity rule), so the page imports other client packages

@@ -5,8 +5,10 @@ repository, and adding one is out of scope. Publishing is a manual step.
 
 **Status (`npm view` 2026-09-23):** both `@buberlo/jev-core` and
 `@buberlo/dsh-jev` list **`0.1.0`, `0.1.2`, `0.1.3`, and `0.1.4`**. There is
-no `0.1.1`. Dist-tag `latest` is **`0.1.4`** for both. Workspace
-`package.json` is **`0.1.4`**.
+no `0.1.1`. Dist-tag `latest` is **`0.1.4`** for both. The **workspace**
+`package.json` is **`0.1.5`** — this adaptation, **not yet published**, so the
+registry line above is unchanged and every install instruction still targets
+`0.1.4`.
 
 `@buberlo/dsh-jev@0.1.2` was packed with npm rather than pnpm, so the
 published tarball still depends on `@buberlo/jev-core` with a literal

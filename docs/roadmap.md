@@ -35,9 +35,14 @@ Nothing here is a promise of a release.
   commit + license) with real-provider discovery and routing tests, a
   configured routing-hint overlay, and de/en evaluation cases.
 - Web client configuration page for the bundle (`plugins.bundle.config`):
-  provider/mode/feature state plus immediate settings writes through the host
-  settings document, covered by host and browser tests. A running `web`
-  profile serves the client module (verified end to end with the `dsh` CLI).
+  provider/mode/feature state plus immediate writes through the config-forms
+  service, whose document is the active profile's Cordis patch. Covered at
+  `0.1.7-rc.2` by the real end-to-end host-side settings test (`settings-section`,
+  hermetic — it pins `DSH_HOME` to a temp home and restores the environment), by
+  the card spec against the real `ConfigForm` contract, and by loading the
+  emitted `lib/client.js`; the in-browser → Host call is not executed. The "a
+  running `web` profile serves the client module" proof was obtained at
+  `0.1.6-alpha.2` and has **not** been re-executed at `0.1.7-rc.2`.
 - First live TypeSafe evaluation (2026-09-19, `jev-1.13.0`): 15/15 fixture
   agreement, 0 errors, mean 528 ms — recorded as a measurement in
   `docs/evaluation.md`.
@@ -78,17 +83,42 @@ Nothing here is a promise of a release.
 - **Skill routing**: injects a bounded hint only; automatic skill body loading
   is not attempted (the normal skill mechanism remains in charge).
 - **Web client page**: edits mode, provider, the write-only API key, and
-  feature toggles; model and base URL stay in `cordis.yml`. It shows
+  feature toggles; model and base URL are not exposed as form fields. It shows
   configured state, not live counters (see the blocked Remote capability in
-  `docs/upstream-compatibility.md`).
+  `docs/upstream-compatibility.md`). The **real in-browser → Host write round
+  trip is not executed** here (no browser): the write path is proven on the host
+  side against the real settings stack and on the artifact side by loading the
+  emitted `lib/client.js` (`docs/adaptation/04-client.md` §5, §7, §9.2).
+- **Settings form writes**: a row installed by a patch layer `insert` — how
+  `cordis.patch.yml` installs this bundle — is form-editable; a row existing only
+  in the leaf `cordis.yml` is not (the editor's "overridden by a home patch or
+  command-line overlay" message is misleading in both cases). A non-string
+  `apiKey` (e.g. an unevaluated `!!js` expression) is refused rather than judged
+  (`docs/adaptation/04-client.md` §7, §9.1).
+- **Message-source kind visibility**: the plugin's own `'dsh-jev'` message-source
+  kind is declared by module augmentation in the module that produces the
+  message, so a downstream consumer importing only the package root does not see
+  it in the union. Benign — nothing downstream names the kind and consumers fall
+  through unknown kinds; the measured remedy was deliberately not taken
+  (`docs/adaptation/03-host.md` §1.2).
 - **Client test runtime**: the published
-  `@deepseek-ai/dsh-client-test-runtime@0.1.6-alpha.2` cannot be loaded from
-  npm (it imports renderer `src/` paths the published renderer does not ship),
-  so the browser tests exercise `apply()` and the component directly.
+  `@deepseek-ai/dsh-client-test-runtime@0.1.7-rc.2` still cannot be loaded from
+  npm. It imports renderer `src/` paths the published renderer does not ship,
+  and a second import (`dsh-api-session-controller/src/client/scope.ts`) points
+  at a package whose published tarball ships no `src/` either; the direct import
+  fails with `ERR_MODULE_NOT_FOUND` (executed — `docs/adaptation/05-tests.md`
+  §5). The browser tests therefore exercise `apply()` and the component
+  directly.
+- **The repo's own `pnpm typecheck` gate compiles `src/**` only**, so a stale
+  type-only import inside `tests/**` is invisible to it. Pre-existing; the
+  upgrade caused one such import (fixed) and three others were already there
+  (`docs/adaptation/05-tests.md` §4.2).
 - **Live provider**: fully implemented, not executed here (no credentials).
 - **Registry line is `0.1.4`.** `npm view` 2026-09-23 lists `0.1.0`,
-  `0.1.2`, `0.1.3`, and `0.1.4`; `latest` is `0.1.4` for both packages,
-  matching the workspace. Local `0.1.1` added package READMEs and was never
+  `0.1.2`, `0.1.3`, and `0.1.4`; `latest` is `0.1.4` for both packages. The
+  **workspace** is now `0.1.5` (this adaptation, **not yet published**), so the
+  registry line above still governs every install. Local `0.1.1` added package
+  READMEs and was never
   published. Workspace `0.1.2` fixed the assessment question wording measured
   by the use case (read false positives). `@buberlo/dsh-jev@0.1.2` on npm
   still has a literal `workspace:^` dependency and does not install; do not

@@ -14,11 +14,28 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { combineSignals } from '@buberlo/jev-core'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { boundContextSummary, createUserMessage, type ContextFormed } from '@deepseek-ai/dsh-llm'
 import { isModelInvocable } from '@deepseek-ai/dsh-skill'
 import { buildSelectionCatalog } from '../config.js'
 import { describeThrown, type JevRuntime } from '../service.js'
 import type { AgentState } from '../state.js'
+
+/**
+ * This plugin's own `MessageSource.kind`, declared where the plugin's message
+ * is produced — the pattern 0.1.7-rc.2 requires of every producer.
+ *
+ * `MessageSourceMap` is a merge-extensible sum type: `kind` answers *who
+ * produced this*, `ContextFormed.form` answers *what kind of thing it is*.
+ * 0.1.7-rc.2 deleted the shared catch-all `plugin` kind
+ * (`dsh-llm/lib/types/message.d.ts:96-99`), so a plugin must contribute its
+ * own member instead of borrowing an upstream producer's identity.
+ */
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** Context injected by the `dsh-jev` plugin. */
+    'dsh-jev': { kind: 'dsh-jev' } & ContextFormed
+  }
+}
 
 /** Install the pre-step listeners. */
 export function installPreStepAdapter(ctx: Context, runtime: JevRuntime): void {
@@ -233,7 +250,7 @@ async function runSkills(
       type: 'text',
       text: `Skill routing suggestion: "${result.skill}"${detail}. Load its full instructions only if it helps with the current task.`,
     }],
-    source: { kind: 'plugin', plugin: 'dsh-jev', form: 'notice', summary: `skill: ${result.skill}` },
+    source: { kind: 'dsh-jev', form: 'notice', summary: boundContextSummary(`skill: ${result.skill}`) },
   }))
   runtime.log('info', 'skill suggestion injected', { skill: result.skill })
 }

@@ -1,0 +1,11 @@
+# Line-ending policy.
+#
+# `scripts/verify.sh` is invoked as `bash scripts/verify.sh`. With
+# `core.autocrlf=true` and no attributes, Git checked it out CRLF, so bash on
+# this machine (WSL at C:\Windows\System32\bash.exe) parsed
+# `set -euo pipefail\r` and died with
+#   scripts/verify.sh: line 4: set: pipefail: invalid option name
+# before running a single stage. Shell scripts must be LF in the working tree
+# everywhere, so they are checked out and committed with LF regardless of the
+# user's autocrlf setting.
+*.sh text eol=lf

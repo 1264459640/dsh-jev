@@ -13,7 +13,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { JevCardFace } from './jev-card-controller.js'
+import type { JevCardFace, JevSettingValue } from './jev-card-controller.js'
 
 /** Props the renderer binds for the bundle's configuration page. */
 export type JevCardProps =
@@ -54,7 +54,7 @@ export function JevCard(props: JevCardProps): ReactNode {
 
   if (props.view === 'summary') return t('summary')
 
-  const persist = (field: string, value: unknown): void => {
+  const persist = (field: string, value: JevSettingValue): void => {
     setState('saving')
     setError('')
     props.setField(field, value).then(

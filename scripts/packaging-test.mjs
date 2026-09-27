@@ -8,7 +8,7 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,9 +19,21 @@ const packs = join(work, 'packs')
 const consumer = join(work, 'consumer')
 const keep = process.argv.includes('--keep')
 
-const DSH_VERSION = '0.1.6-alpha.2'
-const CORDIS_VERSION = '4.0.2'
+const DSH_VERSION = '0.1.7-rc.2'
+const CORDIS_VERSION = '4.0.4'
 const TYPESCRIPT_VERSION = '6.0.3'
+
+// Windows ships `pnpm` / `npm` / the `node_modules/.bin` entry points as `.cmd`
+// shims, which `execFileSync` cannot start without a shell (ENOENT without one,
+// EINVAL when the `.cmd` is given as the file). POSIX keeps the plain spawn, so
+// the same script still runs unchanged on CI. Only process spawning is affected.
+const isWindows = process.platform === 'win32'
+const shim = name => (isWindows ? `${name}.cmd` : name)
+const shimOptions = isWindows ? { shell: true } : {}
+// `shell: true` concatenates argv without quoting, so the one argument that can
+// contain a space (the temp destination) is quoted on Windows. cmd strips the
+// quotes before the `.cmd` shim sees the value.
+const packsArg = isWindows ? `"${packs}"` : packs
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -36,11 +48,12 @@ function step(message) {
 }
 
 try {
-  run('mkdir', ['-p', packs, consumer])
+  mkdirSync(packs, { recursive: true })
+  mkdirSync(consumer, { recursive: true })
 
   step('packing @buberlo/jev-core and @buberlo/dsh-jev')
   for (const pkg of ['packages/jev-core', 'packages/dsh-jev']) {
-    run('pnpm', ['pack', '--pack-destination', packs], { cwd: join(root, pkg) })
+    run(shim('pnpm'), ['pack', '--pack-destination', packsArg], { cwd: join(root, pkg), ...shimOptions })
   }
   const tarballs = readdirSync(packs).filter(name => name.endsWith('.tgz'))
   const coreTar = tarballs.find(name => name.includes('jev-core'))
@@ -72,7 +85,7 @@ try {
   }, null, 2))
 
   step('installing tarballs + pinned DSH peers (npm, no registry dependency on @buberlo/*)')
-  run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: consumer })
+  run(shim('npm'), ['install', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: consumer, ...shimOptions })
 
   step('checking the packed manifests')
   const packedManifest = JSON.parse(run('tar', ['-xOf', join(packs, dshTar), 'package/package.json']))
@@ -167,7 +180,7 @@ const reactStub = { useState: (value) => [typeof value === 'function' ? value() 
 const jsxStub = { jsx: () => null, jsxs: () => null, Fragment: {} }
 const clientExports = loaded.factory((id) => id === 'react' ? reactStub : jsxStub)
 assert.equal(typeof clientExports.apply, 'function', 'client artifact must export apply')
-assert.deepEqual([...clientExports.inject].sort(), ['locale', 'remote', 'settingsScope', 'slots'])
+assert.deepEqual([...clientExports.inject].sort(), ['configForms', 'locale', 'slots'])
 
 await ctx.fiber.dispose()
 console.log('smoke: OK (standalone core, real plugin load, fail-closed enforcement, single cordis, client artifact)')
@@ -200,8 +213,8 @@ export const used = config
     },
     include: ['consumer-types.ts'],
   }, null, 2))
-  const tsc = join(consumer, 'node_modules', '.bin', 'tsc')
-  console.log(run(tsc, ['--noEmit'], { cwd: consumer }).trim() || 'tsc: no output (clean)')
+  const tsc = join(consumer, 'node_modules', '.bin', shim('tsc'))
+  console.log(run(tsc, ['--noEmit'], { cwd: consumer, ...shimOptions }).trim() || 'tsc: no output (clean)')
 
   step('packaging test PASSED')
   console.log(`  consumer: ${consumer}`)

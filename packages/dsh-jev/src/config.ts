@@ -10,6 +10,7 @@
  */
 
 import z from '@deepseek-ai/schemastery'
+import type { Volatile } from '@deepseek-ai/cordis'
 import type { JevThresholds, MockScenario, ToolCandidateInfo, ToolCategoryInfo } from '@buberlo/jev-core'
 
 /** One configured model route target. */
@@ -121,73 +122,172 @@ export interface Config {
   }
 }
 
+/** One configured model route target behind its live references. */
+export interface ParsedModelRouteConfig {
+  provider: Volatile<string | undefined>
+  model: Volatile<string | undefined>
+}
+
+/**
+ * The configuration Cordis hands a plugin instance: every field the settings
+ * document may edit is a live reference rather than a value.
+ *
+ * This is the schema's declared OUTPUT type. Naming it here is what makes the
+ * schema's type portable (an inferred type would have to reference cosmokit's
+ * `Dict` through `z.dict`), and annotating with it also makes the compiler check
+ * that the schema really produces this shape. Read it through
+ * {@link plainConfig}; never read a field directly, because a reference is not
+ * the value it carries.
+ */
+export interface ParsedConfig {
+  provider: Volatile<'mock' | 'live'>
+  mode: Volatile<'off' | 'shadow' | 'enforce'>
+  model: Volatile<string | undefined>
+  apiKey: Volatile<string | undefined>
+  baseURL: Volatile<string | undefined>
+  timeoutMs: Volatile<number>
+  budgetMs: Volatile<number>
+  maxRetries: Volatile<number>
+  maxConcurrent: Volatile<number>
+  maxStateChars: Volatile<number>
+  maxArgumentChars: Volatile<number>
+  maxCategories: Volatile<number>
+  maxCandidatesPerQuestion: Volatile<number>
+  maxSelectedTools: Volatile<number>
+  maxSkills: Volatile<number>
+  redactKeys: Volatile<string[]>
+  logDecisions: Volatile<boolean>
+  thresholds: {
+    relevance: Volatile<number>
+    selection: Volatile<number>
+    confidence: Volatile<number>
+    restriction: Volatile<number>
+    missingInformation: Volatile<number>
+    taskMatch: Volatile<number>
+    skill: Volatile<number>
+    modelRoute: Volatile<number>
+  }
+  selection: {
+    enabled: Volatile<boolean>
+    alwaysAllow: Volatile<string[]>
+    categories: Volatile<Record<string, string>>
+    toolCategories: Volatile<Record<string, string[]>>
+  }
+  assessment: {
+    enabled: Volatile<boolean>
+    onFailure: Volatile<'ask' | 'hold'>
+    includeRiskScore: Volatile<boolean>
+    restrictions: Volatile<string[]>
+  }
+  loopDetection: {
+    enabled: Volatile<boolean>
+    maxRepeats: Volatile<number>
+    maxSubjects: Volatile<number>
+  }
+  skills: {
+    enabled: Volatile<boolean>
+    injectHint: Volatile<boolean>
+    routingHints: Volatile<Record<string, string>>
+    maxDescriptionChars: Volatile<number>
+  }
+  modelRouting: {
+    enabled: Volatile<boolean>
+    routes: {
+      fast?: ParsedModelRouteConfig
+      balanced?: ParsedModelRouteConfig
+      reasoning?: ParsedModelRouteConfig
+    }
+  }
+  /** Ordinary configuration: parsed as supplied, not as a reference. */
+  mock: {
+    answers?: MockScenario['answers']
+    delayMs?: number
+  }
+}
+
 const routeSchema = z.object({
-  provider: z.string(),
-  model: z.string(),
+  provider: z.string().volatile(),
+  model: z.string().volatile(),
 })
 
 const thresholdsSchema = z.object({
-  relevance: z.number().default(0.5),
-  selection: z.number().default(0.35),
-  confidence: z.number().default(0.3),
-  restriction: z.number().default(0.5),
-  missingInformation: z.number().default(0.5),
-  taskMatch: z.number().default(0.35),
-  skill: z.number().default(0.5),
-  modelRoute: z.number().default(0.4),
+  relevance: z.number().default(0.5).volatile(),
+  selection: z.number().default(0.35).volatile(),
+  confidence: z.number().default(0.3).volatile(),
+  restriction: z.number().default(0.5).volatile(),
+  missingInformation: z.number().default(0.5).volatile(),
+  taskMatch: z.number().default(0.35).volatile(),
+  skill: z.number().default(0.5).volatile(),
+  modelRoute: z.number().default(0.4).volatile(),
 })
 
-/** Schemastery schema for the plugin config. */
-export const Config: z<Config> = z.object({
-  provider: z.union(['mock', 'live'] as const).default('mock'),
-  mode: z.union(['off', 'shadow', 'enforce'] as const).default('shadow'),
-  model: z.string(),
-  apiKey: z.string().role('secret'),
-  baseURL: z.string(),
-  timeoutMs: z.natural().default(5000),
-  budgetMs: z.natural().default(8000),
-  maxRetries: z.natural().default(1),
-  maxConcurrent: z.natural().min(1).default(2),
-  maxStateChars: z.natural().default(4000),
-  maxArgumentChars: z.natural().default(1200),
-  maxCategories: z.natural().default(8),
-  maxCandidatesPerQuestion: z.natural().default(40),
-  maxSelectedTools: z.natural().default(12),
-  maxSkills: z.natural().default(20),
-  redactKeys: z.array(z.string()).default([]),
-  logDecisions: z.boolean().default(true),
+/**
+ * Schemastery schema for the plugin config.
+ *
+ * Every field the settings document may edit carries `.volatile()`: the Loader
+ * parses such a field into a stable reference it can commit in place, and the
+ * settings document exposes exactly the volatile fields as a form
+ * (`@deepseek-ai/dsh-settings`' `volatileForm`/`isVolatilePath`). A field left
+ * ordinary stays out of every form and is preserved verbatim by a form write.
+ *
+ * Constraints schemastery enforces (measured, not assumed): a volatile node
+ * must sit at a fixed object path, so array and dict fields are marked on the
+ * node itself and never on their element type, and a volatile node may not
+ * nest inside another volatile node. Nested objects therefore stay plain and
+ * carry volatile leaves.
+ */
+export const Config: z<Config, ParsedConfig> = z.object({
+  provider: z.union(['mock', 'live'] as const).default('mock').volatile(),
+  mode: z.union(['off', 'shadow', 'enforce'] as const).default('shadow').volatile(),
+  model: z.string().volatile(),
+  apiKey: z.string().role('secret').volatile(),
+  baseURL: z.string().volatile(),
+  timeoutMs: z.natural().default(5000).volatile(),
+  budgetMs: z.natural().default(8000).volatile(),
+  maxRetries: z.natural().default(1).volatile(),
+  maxConcurrent: z.natural().min(1).default(2).volatile(),
+  maxStateChars: z.natural().default(4000).volatile(),
+  maxArgumentChars: z.natural().default(1200).volatile(),
+  maxCategories: z.natural().default(8).volatile(),
+  maxCandidatesPerQuestion: z.natural().default(40).volatile(),
+  maxSelectedTools: z.natural().default(12).volatile(),
+  maxSkills: z.natural().default(20).volatile(),
+  redactKeys: z.array(z.string()).default([]).volatile(),
+  logDecisions: z.boolean().default(true).volatile(),
   thresholds: thresholdsSchema,
   selection: z.object({
-    enabled: z.boolean().default(true),
-    alwaysAllow: z.array(z.string()).default([]),
-    categories: z.dict(z.string()).default({}),
-    toolCategories: z.dict(z.array(z.string())).default({}),
+    enabled: z.boolean().default(true).volatile(),
+    alwaysAllow: z.array(z.string()).default([]).volatile(),
+    categories: z.dict(z.string()).default({}).volatile(),
+    toolCategories: z.dict(z.array(z.string())).default({}).volatile(),
   }),
   assessment: z.object({
-    enabled: z.boolean().default(true),
-    onFailure: z.union(['ask', 'hold'] as const).default('ask'),
-    includeRiskScore: z.boolean().default(false),
-    restrictions: z.array(z.string()).default([]),
+    enabled: z.boolean().default(true).volatile(),
+    onFailure: z.union(['ask', 'hold'] as const).default('ask').volatile(),
+    includeRiskScore: z.boolean().default(false).volatile(),
+    restrictions: z.array(z.string()).default([]).volatile(),
   }),
   loopDetection: z.object({
-    enabled: z.boolean().default(true),
-    maxRepeats: z.natural().min(2).default(2),
-    maxSubjects: z.natural().min(1).default(64),
+    enabled: z.boolean().default(true).volatile(),
+    maxRepeats: z.natural().min(2).default(2).volatile(),
+    maxSubjects: z.natural().min(1).default(64).volatile(),
   }),
   skills: z.object({
-    enabled: z.boolean().default(false),
-    injectHint: z.boolean().default(true),
-    routingHints: z.dict(z.string()).default({}),
-    maxDescriptionChars: z.natural().min(1).default(240),
+    enabled: z.boolean().default(false).volatile(),
+    injectHint: z.boolean().default(true).volatile(),
+    routingHints: z.dict(z.string()).default({}).volatile(),
+    maxDescriptionChars: z.natural().min(1).default(240).volatile(),
   }),
   modelRouting: z.object({
-    enabled: z.boolean().default(false),
+    enabled: z.boolean().default(false).volatile(),
     routes: z.object({
       fast: routeSchema,
       balanced: routeSchema,
       reasoning: routeSchema,
     }),
   }),
+  // Ordinary configuration: scenario data no settings form edits, kept intact
+  // by every form write (`SettingsForms.write` strips only volatile fields).
   mock: z.object({
     answers: z.any(),
     delayMs: z.natural().default(0),
@@ -249,6 +349,30 @@ export interface ResolvedSettings {
     answers: NonNullable<MockScenario['answers']>
     delayMs: number
   }
+}
+
+/**
+ * Read the plain values behind Cordis's live config references.
+ *
+ * A field this schema marks `.volatile()` is parsed into a `Volatile`
+ * reference rather than a value, so `resolveSettings` must be handed the
+ * reference contents instead of the parsed object. `Schema.simplify` is the
+ * schemastery operation for exactly that: it resolves every reference and drops
+ * values equal to their schema default. Dropping those is safe here because
+ * {@link resolveSettings} re-applies the identical default for every field, so
+ * the resolved settings never depend on which side supplied it. The document's
+ * whole-config default makes `simplify` return `null` for an unconfigured
+ * entry; a plugin with no config fields at all is the same as `{}` here.
+ *
+ * The input is the object Cordis parsed for this fiber, which is reachable both
+ * as the constructor's `config` argument and as `ctx.fiber.config`, because the
+ * Loader commits a committed change into those very references.
+ *
+ * @param config - parsed plugin config (form-editable fields are references).
+ * @returns the same fields as plain data.
+ */
+export function plainConfig(config: Config): Config {
+  return Config.simplify(config) ?? {}
 }
 
 /**

@@ -80,7 +80,7 @@ task as a whole: an observe-only call (read, list, search) does not violate
 a restriction that forbids modifying or deleting.
 
 Wording is the current call-scoped text in
-`packages/jev-core/src/assessment.ts` (workspace `0.1.4`; the wording landed
+`packages/jev-core/src/assessment.ts` (workspace `0.1.5`; the wording landed
 in the `0.1.2` tree). The published npm `0.1.0` still uses the older
 task-level phrasing ("this action"), which false-positived harmless reads
 when the task mentioned a restricted file. `@buberlo/jev-core@0.1.2` and

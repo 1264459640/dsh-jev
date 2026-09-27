@@ -120,8 +120,10 @@ network.
 
 ## 6. Install the plugin into a DSH profile
 
-Current registry release is workspace `0.1.4` (`latest` for both packages,
-`npm view` 2026-09-23). `npm install @buberlo/dsh-jev@0.1.4` succeeds and
+The **published registry line** is `0.1.4` (`latest` for both packages,
+`npm view` 2026-09-23); the **workspace in this checkout** is `0.1.5`, which is
+**not published yet**, so the commands below still install `0.1.4`.
+`npm install @buberlo/dsh-jev@0.1.4` succeeds and
 pulls `@buberlo/jev-core@0.1.4`. Pin the version. `@buberlo/dsh-jev@0.1.2`
 and `@0.1.3` still depend on `@buberlo/jev-core` with a literal
 `workspace:^` (packed with npm, not pnpm); `npm install` of either fails
@@ -135,15 +137,15 @@ dsh plugin --profile demo add @buberlo/dsh-jev@0.1.4
 dsh --profile demo --dump-config | grep -A 2 'buberlo'
 ```
 
-Building from a checkout of workspace `0.1.4` instead. Pack **both**
+Building from a checkout of workspace `0.1.5` instead. Pack **both**
 tarballs with pnpm so `workspace:` is rewritten:
 
 ```sh
 pnpm build
 pnpm --filter @buberlo/jev-core pack --pack-destination ./packs
 pnpm --filter @buberlo/dsh-jev pack --pack-destination ./packs
-dsh plugin --profile demo add ./packs/buberlo-dsh-jev-0.1.4.tgz
-# overlay packs/buberlo-jev-core-0.1.4.tgz on the profile
+dsh plugin --profile demo add ./packs/buberlo-dsh-jev-0.1.5.tgz
+# overlay packs/buberlo-jev-core-0.1.5.tgz on the profile
 # (see BENCH_LOCAL_PACKS in docs/benchmark.md)
 dsh --profile demo --dump-config | grep -A 2 'buberlo'
 ```
@@ -204,10 +206,14 @@ What you see:
 - each toggle with its settings field path, so the value you change is
   traceable back to the configuration.
 
-Writes go into the host settings document (the same place a user-edited
-`settings.yaml` would), and the running service reconfigures on every
-committed change. If a write is rejected, the card shows the schema error and
-the last good configuration stays active.
+Writes go into the active profile's Cordis patch — the document the settings
+service edits at `0.1.7-rc.2` (a legacy `$DSH_HOME/settings.yaml` is imported
+once) — and the running service reconfigures on every committed change. A row
+installed by a bundle's patch (`insert`), which is how this plugin is installed,
+is editable here; a row that exists only in the profile's leaf `cordis.yml` is
+not, and the editor's refusal message ("overridden by a home patch or
+command-line overlay") is misleading when that happens. If a write is rejected,
+the card shows the schema error and the last good configuration stays active.
 
 Headless profiles have no web client; skip this step — the plugin behaves the
 same from its composed entry.

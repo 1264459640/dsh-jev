@@ -18,7 +18,7 @@ import {
   type JevProvider,
   type ToolAssessment,
 } from '@buberlo/jev-core'
-import { Config as ConfigSchema, resolveSettings, type Config, type ResolvedSettings } from './config.js'
+import { Config as ConfigSchema, plainConfig, resolveSettings, type Config, type ResolvedSettings } from './config.js'
 import { installSettingsSection } from './settings-section.js'
 import { AgentState } from './state.js'
 import { installAssessmentAdapter } from './adapters/assessment.js'
@@ -77,7 +77,7 @@ export class JevRuntime extends Service {
   constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'jev')
     this.entryConfig = config
-    this.settingsValue = resolveSettings(config)
+    this.settingsValue = resolveSettings(plainConfig(config))
     this.coreValue = createCore(this.settingsValue)
     this.detector = new LoopDetector({
       maxRepeats: this.settingsValue.loopDetection.maxRepeats,
@@ -135,10 +135,11 @@ export class JevRuntime extends Service {
    * The new core is built first, so a configuration the runtime cannot honor
    * (for example `provider: live` without any key) leaves the running state
    * untouched and the error surfaces to the settings writer.
-   * @param config - the new resolved configuration source.
+   * @param config - the parsed plugin config; its live references hold the
+   * committed values, so re-reading them is what adopts the change.
    */
   reconfigure(config: Config): void {
-    const next = resolveSettings(config)
+    const next = resolveSettings(plainConfig(config))
     const replacement = createCore(next)
     this.coreValue.abortAll(new Error('dsh-jev reconfigured'))
     this.settingsValue = next
